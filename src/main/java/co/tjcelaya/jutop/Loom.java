@@ -7,11 +7,15 @@ import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Validate;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
+import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.lang.System.out;
@@ -21,44 +25,77 @@ import static java.lang.System.out;
  */
 public class Loom implements Serializable {
 
-    public static final String REGEX_THREAD_NAME = "^(\\.?[A-z0-9])+$";
+    // public static final String REGEX_THREAD_NAME = "^(\\.?[-A-z0-9])+$";
+    public static final Pattern REGEX_THREAD_NAME = Pattern.compile("[0-9a-z-]+");
+
     private final LinkedHashMap<String, String> threads;
     private final Deque<String> attention;
     private final String name;
 
     private static final ObjectMapper MAPPER;
+    private static final String NULLFOCUS = "";
+
+    public static final String INTERRUPT = "I";
+    public static final String EXIT = "E";
+    public static final String KILL = "K";
 
     static {
         MAPPER = new ObjectMapper();
         MAPPER.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
     }
 
+    /**
+     * The loom is not concerned with "faster" UUID generation, you can worry about that.
+     */
+    Loom() {
+        this(UUID.randomUUID().toString());
+    }
+
     Loom(final String name) {
-        this.name = name;
-        this.threads = new LinkedHashMap<>();
-        this.attention = new ArrayDeque<>();
+        this(name, new LinkedHashMap<>(), new ArrayDeque<>());
     }
 
     @JsonCreator
     Loom(@JsonProperty("name") final String name,
          @JsonProperty("threads") final LinkedHashMap<String, String> threads,
-         @JsonProperty("attention") final Deque<String> attention)
-    {
+         @JsonProperty("attention") final Deque<String> attention) {
+
+        if (!REGEX_THREAD_NAME.matcher(name).matches()) {
+            throw new IllegalArgumentException(name);
+        }
+
         this.name = name;
         this.threads = threads;
         this.attention = attention;
     }
 
-    void spawn(final String thread) {
-        if (!thread.matches(REGEX_THREAD_NAME)) {
+    public void spawn(final String thread) {
+        if (!REGEX_THREAD_NAME.matcher(thread).matches()) {
             throw new IllegalArgumentException("invalid thread name: " + thread);
         }
         threads.put(thread, "");
+
+        final String focus = attention.peek();
+        if (focus != null && focus.equals(NULLFOCUS)) {
+            attention.pop();
+        }
+
+        if (attention.isEmpty()) {
+            attention.push(thread);
+        }
     }
 
-    void interrupt(final String thread) {
-        if (!attention.isEmpty() && attention.peek() == null) {
+    public void interrupt(final String thread) {
+        final String focus = attention.peek();
+        if (focus != null && focus.equals(NULLFOCUS)) {
             attention.pop(); // refocus
+        }
+
+        if (attention.contains(thread)) {
+            updateThread(thread, INTERRUPT);
+            attention.removeFirstOccurrence(thread);
+            attention.push(thread);
+            return;
         }
 
         if (threads.containsKey(thread)) {
@@ -70,7 +107,7 @@ public class Loom implements Serializable {
             return;
         }
 
-        if (!thread.matches(REGEX_THREAD_NAME)) {
+        if (!REGEX_THREAD_NAME.matcher(thread).matches()) {
             throw new IllegalArgumentException("invalid thread name: " + thread);
         }
 
@@ -78,54 +115,64 @@ public class Loom implements Serializable {
         attention.push(thread);
     }
 
-    void exit(final String thread) {
+    public void exit() {
+        if (!isSuspended()) {
+            throw new IllegalStateException("Nothing from which to exit");
+        }
+
+
+        exit(attention.pop());
+    }
+
+    public void exit(final String thread) {
         final String t = tumble(thread);
 
         if (!threads.containsKey(t)) {
             throw new NoSuchElementException("thread not found: " + t);
         }
 
-        threads.put(t, threads.get(t) + "E");
+        updateThread(t, EXIT);
 
         if (attention.contains(t)) {
             attention.removeLastOccurrence(t);
         }
     }
 
-    void kill(final String thread) {
+    private void updateThread(final String thread, final String status) {
+        threads.put(thread, threads.get(thread) + status);
+    }
+
+    public void kill(final String thread) {
         final String t = tumble(thread);
 
         if (!threads.containsKey(t)) {
             throw new NoSuchElementException("thread not found: " + t);
         }
 
-        threads.put(t, threads.get(t) + "K");
+        updateThread(t, KILL);
 
         if (isRunningThread(t)) {
             attention.pop();
         }
     }
 
-    void stop() {
-        final String focus = attention.peek();
-        if (focus != null) {
-            attention.push(null);
+    public void stop() {
+        if (!attention.peek().equals(NULLFOCUS)) {
+            attention.push(NULLFOCUS);
         }
     }
 
-    void resume() {
-        final String focus = attention.peek();
-        if (focus != null) {
+    public void resume() {
+        if (!attention.peek().equals(NULLFOCUS)) {
             throw new IllegalStateException("not stopped");
         }
 
         attention.pop();
     }
 
-    // Thread reads
-
     /**
      * Fall into a target thread.
+     *
      * @param target intended target
      * @return the target if given, last thread otherwise
      */
@@ -145,18 +192,36 @@ public class Loom implements Serializable {
         throw new NoSuchElementException("fell flat");
     }
 
-    String status() {
+    // Reads
+
+    public String getName() {
+        return name;
+    }
+
+    // Thread reads
+
+    public String current() {
+        return attention.isEmpty() ? "" : attention.peek();
+    }
+
+    private String status() {
         if (attention.isEmpty()) {
-            return "";
+            return " - STOP -";
         } else {
-            return attention.stream()
+            return " RUN: " +
+                    attention.stream()
                     .map(at -> ObjectUtils.firstNonNull(at, "PAUSED"))
                     .collect(Collectors.joining(" < "));
         }
     }
 
+    boolean isSuspended() {
+        return !attention.isEmpty() || attention.peek() == null;
+    }
+
     boolean isRunning() {
-        return !attention.isEmpty() && attention.peek() != null;
+        final String focus = attention.peek();
+        return focus != null && !focus.equals(NULLFOCUS);
     }
 
     boolean isRunningThread(final String thread) {
@@ -166,7 +231,10 @@ public class Loom implements Serializable {
     // Utility
 
     String print() {
-        final StringBuilder sb = new StringBuilder("status: ").append(status()).append('\n');
+        final StringBuilder sb = new StringBuilder("name: ")
+                .append(getName())
+                .append("\n\nstatus: ")
+                .append(status()).append("\n\n");
 
         if (threads.isEmpty()) {
             return sb.toString();
@@ -221,12 +289,12 @@ public class Loom implements Serializable {
 
     // Persistence
 
-    void save(final File file) throws IOException {
+    public void save(final File file) throws IOException {
         MAPPER.writeValue(file, this);
         out.println("wrote self to " + file);
     }
 
-    static Loom load(final File file) throws IOException, ClassNotFoundException {
+    public static Loom load(final File file) throws IOException, ClassNotFoundException {
         if (file.length() == 0L) {
             return new Loom(file.getName());
         }
