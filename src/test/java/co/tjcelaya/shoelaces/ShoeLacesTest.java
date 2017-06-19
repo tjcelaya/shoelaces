@@ -20,11 +20,11 @@ public class ShoeLacesTest {
         return UUID.randomUUID().toString();
     }
 
-    private void assertCurrentEquals(final ShoeLaces loom, final String name) {
-        Assert.assertEquals(loom.current(), name);
+    private void assertCurrentEquals(final ShoeLaces shoe, final String name) {
+        Assert.assertEquals(shoe.current(), name);
     }
 
-    public void testLoomsHaveNamesAndValidate() throws Exception {
+    public void testShoesHaveNamesAndValidate() throws Exception {
         final String n = randomThreadName();
         final ShoeLaces l = new ShoeLaces(n);
         Assert.assertEquals(n, l.getName());
@@ -32,7 +32,7 @@ public class ShoeLacesTest {
         Assert.assertThrows(() -> new ShoeLaces("3 !@"));
     }
 
-    public void testLoomThreadNamesAreValidatedToo() throws Exception {
+    public void testShoeThreadNamesAreValidatedToo() throws Exception {
         final ShoeLaces l = new ShoeLaces(randomThreadName());
         Assert.assertThrows(() -> l.interrupt(""));
         Assert.assertThrows(() -> l.interrupt("s-!@#$%^&*()"));
@@ -249,10 +249,10 @@ public class ShoeLacesTest {
         final File f = new File(System.getProperty("java.io.tmpdir") + "/" + filename + ".sldb");
         f.deleteOnExit();
 
-        final ShoeLaces emptyLoom = ShoeLaces.load(f);
-        assertFalse(emptyLoom.isRunning());
+        final ShoeLaces emptyShoe = ShoeLaces.load(f);
+        assertFalse(emptyShoe.isRunning());
 
-        assertEquals(filename, emptyLoom.getName());
+        assertEquals(filename, emptyShoe.getName());
     }
 
     public void testSaveAndLoadWithData() throws Exception {
