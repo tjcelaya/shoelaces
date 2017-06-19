@@ -1,4 +1,4 @@
-package co.tjcelaya.jutop;
+package co.tjcelaya.shoelaces;
 
 import org.apache.commons.cli.*;
 import org.apache.commons.lang3.StringUtils;
@@ -19,11 +19,11 @@ import static org.apache.commons.lang3.ObjectUtils.firstNonNull;
  */
 public class App {
 
-    private static Loom open(final File dbFile) throws IOException, ClassNotFoundException {
+    private static ShoeLaces open(final File dbFile) throws IOException, ClassNotFoundException {
         out.println("using db file: " + dbFile);
 
         if (dbFile.exists()) {
-            return Loom.load(dbFile);
+            return ShoeLaces.load(dbFile);
         }
 
         if (!dbFile.createNewFile()) {
@@ -32,21 +32,37 @@ public class App {
         }
         out.println("created");
 
-        return new Loom(dbFile.getName());
+        return new ShoeLaces(dbFile.getName());
+    }
+
+    private static String findThreadFromOption(ShoeLaces db, CommandLine invocation, final String opt) {
+        final String raw = StringUtils.trimToEmpty(invocation.getOptionValue(opt));
+        if (!NumberUtils.isDigits(raw)) {
+            return raw;
+        }
+
+        try {
+            return db.lookup(parseInt(raw));
+        } catch (NoSuchElementException e) {
+            err.println(e.getMessage());
+            out.println(db.print());
+            exit(1);
+            return null;
+        }
     }
 
     public static void main(String[] args) throws IOException, ParseException, ClassNotFoundException {
         final File file = new File(StringUtils.join(
                 firstNonNull(
-                        getenv("JUTOP_HOME"),
+                        getenv("SHOELACES_HOME"),
                         getProperty("user.dir")),
                 File.separator,
                 firstNonNull(
-                        getenv("JUTOP_FILE"),
+                        getenv("SHOELACES_FILE"),
                         DateTimeFormatter.ISO_DATE.format(LocalDate.now())),
-                ".jtdb"));
+                ".sldb"));
 
-        final Loom db = open(file);
+        final ShoeLaces db = open(file);
         final Options opts = new Options()
                 .addOption("a", "add", true, "spawn a new thread")
                 .addOption("k", "kill", false, "kill a thread")
@@ -72,7 +88,7 @@ public class App {
 
         if (invocation.hasOption("h")) {
             HelpFormatter formatter = new HelpFormatter();
-            formatter.printHelp( "jutop [-akiehbf [THREAD]]", opts);
+            formatter.printHelp( "sl [-akiehbf [THREAD]]", opts);
             exit(0);
             return;
         }
@@ -126,21 +142,5 @@ public class App {
 
         db.save(file);
         out.println(db.print());
-    }
-
-    private static String findThreadFromOption(Loom db, CommandLine invocation, final String opt) {
-        final String raw = StringUtils.trimToEmpty(invocation.getOptionValue(opt));
-        if (!NumberUtils.isDigits(raw)) {
-            return raw;
-        }
-
-        try {
-            return db.lookup(parseInt(raw));
-        } catch (NoSuchElementException e) {
-            err.println(e.getMessage());
-            out.println(db.print());
-            exit(1);
-            return null;
-        }
     }
 }

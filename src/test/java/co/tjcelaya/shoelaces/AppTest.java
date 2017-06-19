@@ -1,6 +1,4 @@
-package co.tjcelaya.jutop;
-
-import org.testng.*;
+package co.tjcelaya.shoelaces;
 
 /**
  * Unit test for simple App.

@@ -1,32 +1,25 @@
-package co.tjcelaya.jutop;
+package co.tjcelaya.shoelaces;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.Validate;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
-import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import static java.lang.System.out;
 
 /**
  * Created by tomascelaya on 5/28/17.
  */
-public class Loom implements Serializable {
+public class ShoeLaces implements Serializable {
 
-    // public static final String REGEX_THREAD_NAME = "^(\\.?[-A-z0-9])+$";
-    public static final Pattern REGEX_THREAD_NAME = Pattern.compile("[0-9a-z-]+");
+    public static final Pattern REGEX_THREAD_NAME =
+            Pattern.compile("^([0-9a-z-]+\\.)*[0-9a-z-]+$");
 
     private final LinkedHashMap<String, String> threads;
     private final Deque<String> attention;
@@ -45,20 +38,20 @@ public class Loom implements Serializable {
     }
 
     /**
-     * The loom is not concerned with "faster" UUID generation, you can worry about that.
+     * The laces are not concerned with "faster" UUID generation, you can worry about that.
      */
-    Loom() {
+    ShoeLaces() {
         this(UUID.randomUUID().toString());
     }
 
-    Loom(final String name) {
+    ShoeLaces(final String name) {
         this(name, new LinkedHashMap<>(), new ArrayDeque<>());
     }
 
     @JsonCreator
-    Loom(@JsonProperty("name") final String name,
-         @JsonProperty("threads") final LinkedHashMap<String, String> threads,
-         @JsonProperty("attention") final Deque<String> attention) {
+    ShoeLaces(@JsonProperty("name") final String name,
+              @JsonProperty("threads") final LinkedHashMap<String, String> threads,
+              @JsonProperty("attention") final Deque<String> attention) {
 
         if (!REGEX_THREAD_NAME.matcher(name).matches()) {
             throw new IllegalArgumentException(name);
@@ -73,12 +66,8 @@ public class Loom implements Serializable {
         if (!REGEX_THREAD_NAME.matcher(thread).matches()) {
             throw new IllegalArgumentException("invalid thread name: " + thread);
         }
-        threads.put(thread, "");
 
-        final String focus = attention.peek();
-        if (focus != null && focus.equals(NULLFOCUS)) {
-            attention.pop();
-        }
+        threads.put(thread, "");
 
         if (attention.isEmpty()) {
             attention.push(thread);
@@ -98,15 +87,6 @@ public class Loom implements Serializable {
             return;
         }
 
-        if (threads.containsKey(thread)) {
-            // bring to front
-            if (attention.contains(thread)) {
-                attention.removeLastOccurrence(thread);
-            }
-            attention.push(thread);
-            return;
-        }
-
         if (!REGEX_THREAD_NAME.matcher(thread).matches()) {
             throw new IllegalArgumentException("invalid thread name: " + thread);
         }
@@ -116,10 +96,9 @@ public class Loom implements Serializable {
     }
 
     public void exit() {
-        if (!isSuspended()) {
+        if (!isSuspended() && !isRunning()) {
             throw new IllegalStateException("Nothing from which to exit");
         }
-
 
         exit(attention.pop());
     }
@@ -142,6 +121,14 @@ public class Loom implements Serializable {
         threads.put(thread, threads.get(thread) + status);
     }
 
+    public void kill() {
+        if (!isSuspended() && !isRunning()) {
+            throw new IllegalStateException("Nothing running to kill");
+        }
+
+        exit(attention.pop());
+    }
+
     public void kill(final String thread) {
         final String t = tumble(thread);
 
@@ -150,10 +137,7 @@ public class Loom implements Serializable {
         }
 
         updateThread(t, KILL);
-
-        if (isRunningThread(t)) {
-            attention.pop();
-        }
+        attention.removeFirstOccurrence(t);
     }
 
     public void stop() {
@@ -163,11 +147,16 @@ public class Loom implements Serializable {
     }
 
     public void resume() {
-        if (!attention.peek().equals(NULLFOCUS)) {
-            throw new IllegalStateException("not stopped");
+        final String focus = attention.peek();
+        if (focus == null) {
+            throw new IllegalStateException("Nothing to resume");
         }
 
-        attention.pop();
+        if (focus.equals(NULLFOCUS)) {
+            attention.pop();
+        }
+
+        // noop if not suspended
     }
 
     /**
@@ -181,11 +170,9 @@ public class Loom implements Serializable {
             return target;
         }
 
-        if (attention.peek() == null) {
-            attention.pop();
-        }
+        final String focus = attention.peek();
 
-        if (!attention.isEmpty() && attention.peek() != null) {
+        if (focus != null && !focus.equals(NULLFOCUS)) {
             return attention.pop();
         }
 
@@ -201,7 +188,11 @@ public class Loom implements Serializable {
     // Thread reads
 
     public String current() {
-        return attention.isEmpty() ? "" : attention.peek();
+        final String focus = attention.peek();
+
+        return focus == null || focus.equals(NULLFOCUS)
+                ? null
+                : focus;
     }
 
     private String status() {
@@ -210,27 +201,25 @@ public class Loom implements Serializable {
         } else {
             return " RUN: " +
                     attention.stream()
-                    .map(at -> ObjectUtils.firstNonNull(at, "PAUSED"))
-                    .collect(Collectors.joining(" < "));
+                            .map(at -> ObjectUtils.firstNonNull(at, "PAUSED"))
+                            .collect(Collectors.joining(" < "));
         }
     }
 
     boolean isSuspended() {
-        return !attention.isEmpty() || attention.peek() == null;
+        final String focus = attention.peek();
+        return focus != null && focus.equals(NULLFOCUS);
     }
 
-    boolean isRunning() {
+    @JsonIgnore
+    public boolean isRunning() {
         final String focus = attention.peek();
         return focus != null && !focus.equals(NULLFOCUS);
     }
 
-    boolean isRunningThread(final String thread) {
-        return isRunning() && attention.peek().equals(thread);
-    }
-
     // Utility
 
-    String print() {
+    public String print() {
         final StringBuilder sb = new StringBuilder("name: ")
                 .append(getName())
                 .append("\n\nstatus: ")
@@ -271,7 +260,7 @@ public class Loom implements Serializable {
         return sb.append('\n').toString();
     }
 
-    String lookup(final int tid) {
+    public String lookup(final int tid) {
         final Iterator<String> s = threads.keySet().iterator();
         int i = 0;
         String threadName;
@@ -291,13 +280,13 @@ public class Loom implements Serializable {
 
     public void save(final File file) throws IOException {
         MAPPER.writeValue(file, this);
-        out.println("wrote self to " + file);
     }
 
-    public static Loom load(final File file) throws IOException, ClassNotFoundException {
+    public static ShoeLaces load(final File file) throws IOException, ClassNotFoundException {
         if (file.length() == 0L) {
-            return new Loom(file.getName());
+            ;
+            return new ShoeLaces(FilenameUtils.getBaseName(file.getName()));
         }
-        return MAPPER.readValue(file, Loom.class);
+        return MAPPER.readValue(file, ShoeLaces.class);
     }
 }
