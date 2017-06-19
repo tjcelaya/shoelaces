@@ -6,6 +6,8 @@ import org.apache.commons.lang3.math.NumberUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.NoSuchElementException;
@@ -25,6 +27,10 @@ public class App {
         if (dbFile.exists()) {
             return ShoeLaces.load(dbFile);
         }
+
+        File p = dbFile.getParentFile();
+
+        err.println(p.getAbsolutePath());
 
         if (!dbFile.createNewFile()) {
             err.println("concurrent access?");
@@ -52,22 +58,23 @@ public class App {
     }
 
     public static void main(String[] args) throws IOException, ParseException, ClassNotFoundException {
-        final File file = new File(StringUtils.join(
+        final Path filePath = Paths.get(
                 firstNonNull(
-                        getenv("SHOELACES_HOME"),
-                        getProperty("user.dir")),
-                File.separator,
+                        getenv("SHOELACES_HOME")
+                                .replaceFirst("^~", System.getProperty("user.home")),
+                        getProperty("user.dir")));
+        final File file = filePath.resolve(
                 firstNonNull(
                         getenv("SHOELACES_FILE"),
-                        DateTimeFormatter.ISO_DATE.format(LocalDate.now())),
-                ".sldb"));
+                        DateTimeFormatter.ISO_DATE.format(LocalDate.now()))
+                + ".sldb").toFile();
 
         final ShoeLaces db = open(file);
         final Options opts = new Options()
                 .addOption("h", "help")
 
                 .addOption("s", "spawn", true, "spawn a new thread")
-                .addOption("k", "kill", true, "kill a thread")
+                .addOption("k", "kill", false, "kill a thread")
 
                 .addOption("i", "interrupt", true, "run a new PRIMARY thread")
                 .addOption("ret", "return", true, "exit the PRIMARY thread and return to <arg>, if given")
@@ -154,6 +161,8 @@ public class App {
             } else {
                 err.println("not paused");
             }
+        } else {
+            err.println("no args");
         }
 
         db.save(file);
