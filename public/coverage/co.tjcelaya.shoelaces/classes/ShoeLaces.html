@@ -1,0 +1,375 @@
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html id="htmlId">
+<head>
+  <title>Coverage Report :: ShoeLaces</title>
+  <style type="text/css">
+    @import "../../css/coverage.css";
+  </style>
+</head>
+
+<body>
+<div class="header"></div>
+
+<div class="content">
+<div class="breadCrumbs">
+    [ <a href="../../index.html">all classes</a> ]
+    [ <a href="../index.html">co.tjcelaya.shoelaces</a> ]
+</div>
+
+<h1>Coverage Summary for Class: ShoeLaces (co.tjcelaya.shoelaces)</h1>
+
+<table class="coverageStats">
+<tr>
+  <th class="name">Class</th>
+<th class="coverageStat 
+">
+  Class, %
+</th>
+<th class="coverageStat 
+">
+  Method, %
+</th>
+<th class="coverageStat 
+">
+  Line, %
+</th>
+</tr>
+<tr>
+  <td class="name">ShoeLaces</td>
+<td class="coverageStat">
+  <span class="percent">
+    100%
+  </span>
+  <span class="absValue">
+    (1/ 1)
+  </span>
+</td>
+<td class="coverageStat">
+  <span class="percent">
+    100%
+  </span>
+  <span class="absValue">
+    (23/ 23)
+  </span>
+</td>
+<td class="coverageStat">
+  <span class="percent">
+    100%
+  </span>
+  <span class="absValue">
+    (128/ 128)
+  </span>
+</td>
+</tr>
+
+</table>
+
+<br/>
+<br/>
+
+
+<div class="sourceCode"><i>1</i>&nbsp;package co.tjcelaya.shoelaces;
+<i>2</i>&nbsp;
+<i>3</i>&nbsp;import com.fasterxml.jackson.annotation.*;
+<i>4</i>&nbsp;import com.fasterxml.jackson.databind.ObjectMapper;
+<i>5</i>&nbsp;import org.apache.commons.io.FilenameUtils;
+<i>6</i>&nbsp;import org.apache.commons.lang3.ObjectUtils;
+<i>7</i>&nbsp;import org.apache.commons.lang3.StringUtils;
+<i>8</i>&nbsp;
+<i>9</i>&nbsp;import java.io.File;
+<i>10</i>&nbsp;import java.io.IOException;
+<i>11</i>&nbsp;import java.io.Serializable;
+<i>12</i>&nbsp;import java.util.*;
+<i>13</i>&nbsp;import java.util.regex.Pattern;
+<i>14</i>&nbsp;import java.util.stream.Collectors;
+<i>15</i>&nbsp;
+<i>16</i>&nbsp;/**
+<i>17</i>&nbsp; * Created by tomascelaya on 5/28/17.
+<i>18</i>&nbsp; */
+<i>19</i>&nbsp;public class ShoeLaces implements Serializable {
+<i>20</i>&nbsp;
+<b class="fc"><i>21</i>&nbsp;    public static final Pattern REGEX_THREAD_NAME =</b>
+<b class="fc"><i>22</i>&nbsp;            Pattern.compile(&quot;^([0-9a-z-]+\\.)*[0-9a-z-]+$&quot;);</b>
+<i>23</i>&nbsp;
+<i>24</i>&nbsp;    private final LinkedHashMap&lt;String, String&gt; threads;
+<i>25</i>&nbsp;    private final Deque&lt;String&gt; attention;
+<i>26</i>&nbsp;    private final String name;
+<i>27</i>&nbsp;
+<i>28</i>&nbsp;    private static final ObjectMapper MAPPER;
+<i>29</i>&nbsp;    private static final String NULLFOCUS = &quot;&quot;;
+<i>30</i>&nbsp;
+<i>31</i>&nbsp;    public static final String INTERRUPT = &quot;I&quot;;
+<i>32</i>&nbsp;    public static final String EXIT = &quot;E&quot;;
+<i>33</i>&nbsp;    public static final String KILL = &quot;K&quot;;
+<i>34</i>&nbsp;
+<i>35</i>&nbsp;    static {
+<b class="fc"><i>36</i>&nbsp;        MAPPER = new ObjectMapper();</b>
+<b class="fc"><i>37</i>&nbsp;        MAPPER.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);</b>
+<b class="fc"><i>38</i>&nbsp;    }</b>
+<i>39</i>&nbsp;
+<i>40</i>&nbsp;    /**
+<i>41</i>&nbsp;     * The laces are not concerned with &quot;faster&quot; UUID generation, you can worry about that.
+<i>42</i>&nbsp;     */
+<i>43</i>&nbsp;    ShoeLaces() {
+<b class="fc"><i>44</i>&nbsp;        this(UUID.randomUUID().toString());</b>
+<b class="fc"><i>45</i>&nbsp;    }</b>
+<i>46</i>&nbsp;
+<i>47</i>&nbsp;    ShoeLaces(final String name) {
+<b class="fc"><i>48</i>&nbsp;        this(name, new LinkedHashMap&lt;&gt;(), new ArrayDeque&lt;&gt;());</b>
+<b class="fc"><i>49</i>&nbsp;    }</b>
+<i>50</i>&nbsp;
+<i>51</i>&nbsp;    @JsonCreator
+<i>52</i>&nbsp;    ShoeLaces(@JsonProperty(&quot;name&quot;) final String name,
+<i>53</i>&nbsp;              @JsonProperty(&quot;threads&quot;) final LinkedHashMap&lt;String, String&gt; threads,
+<b class="fc"><i>54</i>&nbsp;              @JsonProperty(&quot;attention&quot;) final Deque&lt;String&gt; attention) {</b>
+<i>55</i>&nbsp;
+<b class="fc"><i>56</i>&nbsp;        if (!REGEX_THREAD_NAME.matcher(name).matches()) {</b>
+<b class="fc"><i>57</i>&nbsp;            throw new IllegalArgumentException(name);</b>
+<i>58</i>&nbsp;        }
+<i>59</i>&nbsp;
+<b class="fc"><i>60</i>&nbsp;        this.name = name;</b>
+<b class="fc"><i>61</i>&nbsp;        this.threads = threads;</b>
+<b class="fc"><i>62</i>&nbsp;        this.attention = attention;</b>
+<b class="fc"><i>63</i>&nbsp;    }</b>
+<i>64</i>&nbsp;
+<i>65</i>&nbsp;    public void spawn(final String thread) {
+<b class="fc"><i>66</i>&nbsp;        if (!REGEX_THREAD_NAME.matcher(thread).matches()) {</b>
+<b class="fc"><i>67</i>&nbsp;            throw new IllegalArgumentException(&quot;invalid thread name: &quot; + thread);</b>
+<i>68</i>&nbsp;        }
+<i>69</i>&nbsp;
+<b class="fc"><i>70</i>&nbsp;        threads.put(thread, &quot;&quot;);</b>
+<i>71</i>&nbsp;
+<b class="fc"><i>72</i>&nbsp;        if (attention.isEmpty()) {</b>
+<b class="fc"><i>73</i>&nbsp;            attention.push(thread);</b>
+<i>74</i>&nbsp;        }
+<b class="fc"><i>75</i>&nbsp;    }</b>
+<i>76</i>&nbsp;
+<i>77</i>&nbsp;    public void interrupt(final String thread) {
+<b class="fc"><i>78</i>&nbsp;        final String focus = attention.peek();</b>
+<b class="fc"><i>79</i>&nbsp;        if (focus != null &amp;&amp; focus.equals(NULLFOCUS)) {</b>
+<b class="fc"><i>80</i>&nbsp;            attention.pop(); // refocus</b>
+<i>81</i>&nbsp;        }
+<i>82</i>&nbsp;
+<b class="fc"><i>83</i>&nbsp;        if (attention.contains(thread)) {</b>
+<b class="fc"><i>84</i>&nbsp;            updateThread(thread, INTERRUPT);</b>
+<b class="fc"><i>85</i>&nbsp;            attention.removeFirstOccurrence(thread);</b>
+<b class="fc"><i>86</i>&nbsp;            attention.push(thread);</b>
+<b class="fc"><i>87</i>&nbsp;            return;</b>
+<i>88</i>&nbsp;        }
+<i>89</i>&nbsp;
+<b class="fc"><i>90</i>&nbsp;        if (!REGEX_THREAD_NAME.matcher(thread).matches()) {</b>
+<b class="fc"><i>91</i>&nbsp;            throw new IllegalArgumentException(&quot;invalid thread name: &quot; + thread);</b>
+<i>92</i>&nbsp;        }
+<i>93</i>&nbsp;
+<b class="fc"><i>94</i>&nbsp;        threads.put(thread, &quot;&quot;);</b>
+<b class="fc"><i>95</i>&nbsp;        attention.push(thread);</b>
+<b class="fc"><i>96</i>&nbsp;    }</b>
+<i>97</i>&nbsp;
+<i>98</i>&nbsp;    public void exit() {
+<b class="fc"><i>99</i>&nbsp;        if (!isSuspended() &amp;&amp; !isRunning()) {</b>
+<b class="fc"><i>100</i>&nbsp;            throw new IllegalStateException(&quot;Nothing from which to exit&quot;);</b>
+<i>101</i>&nbsp;        }
+<i>102</i>&nbsp;
+<b class="fc"><i>103</i>&nbsp;        exit(attention.pop());</b>
+<b class="fc"><i>104</i>&nbsp;    }</b>
+<i>105</i>&nbsp;
+<i>106</i>&nbsp;    public void exit(final String thread) {
+<b class="fc"><i>107</i>&nbsp;        final String t = tumble(thread);</b>
+<i>108</i>&nbsp;
+<b class="fc"><i>109</i>&nbsp;        if (!threads.containsKey(t)) {</b>
+<b class="fc"><i>110</i>&nbsp;            throw new NoSuchElementException(&quot;thread not found: &quot; + t);</b>
+<i>111</i>&nbsp;        }
+<i>112</i>&nbsp;
+<b class="fc"><i>113</i>&nbsp;        updateThread(t, EXIT);</b>
+<i>114</i>&nbsp;
+<b class="fc"><i>115</i>&nbsp;        if (attention.contains(t)) {</b>
+<b class="fc"><i>116</i>&nbsp;            attention.removeLastOccurrence(t);</b>
+<i>117</i>&nbsp;        }
+<b class="fc"><i>118</i>&nbsp;    }</b>
+<i>119</i>&nbsp;
+<i>120</i>&nbsp;    private void updateThread(final String thread, final String status) {
+<b class="fc"><i>121</i>&nbsp;        threads.put(thread, threads.get(thread) + status);</b>
+<b class="fc"><i>122</i>&nbsp;    }</b>
+<i>123</i>&nbsp;
+<i>124</i>&nbsp;    public void kill() {
+<b class="fc"><i>125</i>&nbsp;        if (!isSuspended() &amp;&amp; !isRunning()) {</b>
+<b class="fc"><i>126</i>&nbsp;            throw new IllegalStateException(&quot;Nothing running to kill&quot;);</b>
+<i>127</i>&nbsp;        }
+<i>128</i>&nbsp;
+<b class="fc"><i>129</i>&nbsp;        exit(attention.pop());</b>
+<b class="fc"><i>130</i>&nbsp;    }</b>
+<i>131</i>&nbsp;
+<i>132</i>&nbsp;    public void kill(final String thread) {
+<b class="fc"><i>133</i>&nbsp;        final String t = tumble(thread);</b>
+<i>134</i>&nbsp;
+<b class="fc"><i>135</i>&nbsp;        if (!threads.containsKey(t)) {</b>
+<b class="fc"><i>136</i>&nbsp;            throw new NoSuchElementException(&quot;thread not found: &quot; + t);</b>
+<i>137</i>&nbsp;        }
+<i>138</i>&nbsp;
+<b class="fc"><i>139</i>&nbsp;        updateThread(t, KILL);</b>
+<b class="fc"><i>140</i>&nbsp;        attention.removeFirstOccurrence(t);</b>
+<b class="fc"><i>141</i>&nbsp;    }</b>
+<i>142</i>&nbsp;
+<i>143</i>&nbsp;    public void stop() {
+<b class="fc"><i>144</i>&nbsp;        if (!attention.peek().equals(NULLFOCUS)) {</b>
+<b class="fc"><i>145</i>&nbsp;            attention.push(NULLFOCUS);</b>
+<i>146</i>&nbsp;        }
+<b class="fc"><i>147</i>&nbsp;    }</b>
+<i>148</i>&nbsp;
+<i>149</i>&nbsp;    public void resume() {
+<b class="fc"><i>150</i>&nbsp;        final String focus = attention.peek();</b>
+<b class="fc"><i>151</i>&nbsp;        if (focus == null) {</b>
+<b class="fc"><i>152</i>&nbsp;            throw new IllegalStateException(&quot;Nothing to resume&quot;);</b>
+<i>153</i>&nbsp;        }
+<i>154</i>&nbsp;
+<b class="fc"><i>155</i>&nbsp;        if (focus.equals(NULLFOCUS)) {</b>
+<b class="fc"><i>156</i>&nbsp;            attention.pop();</b>
+<i>157</i>&nbsp;        }
+<i>158</i>&nbsp;
+<i>159</i>&nbsp;        // noop if not suspended
+<b class="fc"><i>160</i>&nbsp;    }</b>
+<i>161</i>&nbsp;
+<i>162</i>&nbsp;    /**
+<i>163</i>&nbsp;     * Fall into a target thread.
+<i>164</i>&nbsp;     *
+<i>165</i>&nbsp;     * @param target intended target
+<i>166</i>&nbsp;     * @return the target if given, last thread otherwise
+<i>167</i>&nbsp;     */
+<i>168</i>&nbsp;    private String tumble(final String target) {
+<b class="fc"><i>169</i>&nbsp;        if (!StringUtils.isEmpty(target)) {</b>
+<b class="fc"><i>170</i>&nbsp;            return target;</b>
+<i>171</i>&nbsp;        }
+<i>172</i>&nbsp;
+<b class="fc"><i>173</i>&nbsp;        final String focus = attention.peek();</b>
+<i>174</i>&nbsp;
+<b class="fc"><i>175</i>&nbsp;        if (focus != null &amp;&amp; !focus.equals(NULLFOCUS)) {</b>
+<b class="fc"><i>176</i>&nbsp;            return attention.pop();</b>
+<i>177</i>&nbsp;        }
+<i>178</i>&nbsp;
+<b class="fc"><i>179</i>&nbsp;        throw new NoSuchElementException(&quot;fell flat&quot;);</b>
+<i>180</i>&nbsp;    }
+<i>181</i>&nbsp;
+<i>182</i>&nbsp;    // Reads
+<i>183</i>&nbsp;
+<i>184</i>&nbsp;    public String getName() {
+<b class="fc"><i>185</i>&nbsp;        return name;</b>
+<i>186</i>&nbsp;    }
+<i>187</i>&nbsp;
+<i>188</i>&nbsp;    // Thread reads
+<i>189</i>&nbsp;
+<i>190</i>&nbsp;    public String current() {
+<b class="fc"><i>191</i>&nbsp;        final String focus = attention.peek();</b>
+<i>192</i>&nbsp;
+<b class="fc"><i>193</i>&nbsp;        return focus == null || focus.equals(NULLFOCUS)</b>
+<i>194</i>&nbsp;                ? null
+<i>195</i>&nbsp;                : focus;
+<i>196</i>&nbsp;    }
+<i>197</i>&nbsp;
+<i>198</i>&nbsp;    private String status() {
+<b class="fc"><i>199</i>&nbsp;        if (attention.isEmpty()) {</b>
+<b class="fc"><i>200</i>&nbsp;            return &quot; - STOP -&quot;;</b>
+<i>201</i>&nbsp;        } else {
+<b class="fc"><i>202</i>&nbsp;            return &quot; RUN: &quot; +</b>
+<b class="fc"><i>203</i>&nbsp;                    attention.stream()</b>
+<b class="fc"><i>204</i>&nbsp;                            .map(at -&gt; ObjectUtils.firstNonNull(at, &quot;PAUSED&quot;))</b>
+<b class="fc"><i>205</i>&nbsp;                            .collect(Collectors.joining(&quot; &lt; &quot;));</b>
+<i>206</i>&nbsp;        }
+<i>207</i>&nbsp;    }
+<i>208</i>&nbsp;
+<i>209</i>&nbsp;    boolean isSuspended() {
+<b class="fc"><i>210</i>&nbsp;        final String focus = attention.peek();</b>
+<b class="fc"><i>211</i>&nbsp;        return focus != null &amp;&amp; focus.equals(NULLFOCUS);</b>
+<i>212</i>&nbsp;    }
+<i>213</i>&nbsp;
+<i>214</i>&nbsp;    @JsonIgnore
+<i>215</i>&nbsp;    public boolean isRunning() {
+<b class="fc"><i>216</i>&nbsp;        final String focus = attention.peek();</b>
+<b class="fc"><i>217</i>&nbsp;        return focus != null &amp;&amp; !focus.equals(NULLFOCUS);</b>
+<i>218</i>&nbsp;    }
+<i>219</i>&nbsp;
+<i>220</i>&nbsp;    // Utility
+<i>221</i>&nbsp;
+<i>222</i>&nbsp;    public String print() {
+<b class="fc"><i>223</i>&nbsp;        final StringBuilder sb = new StringBuilder(&quot;name: &quot;)</b>
+<b class="fc"><i>224</i>&nbsp;                .append(getName())</b>
+<b class="fc"><i>225</i>&nbsp;                .append(&quot;\n\nstatus: &quot;)</b>
+<b class="fc"><i>226</i>&nbsp;                .append(status()).append(&quot;\n\n&quot;);</b>
+<i>227</i>&nbsp;
+<b class="fc"><i>228</i>&nbsp;        if (threads.isEmpty()) {</b>
+<b class="fc"><i>229</i>&nbsp;            return sb.toString();</b>
+<i>230</i>&nbsp;        }
+<i>231</i>&nbsp;
+<b class="fc"><i>232</i>&nbsp;        final Set&lt;String&gt; threadNames = threads.keySet();</b>
+<b class="fc"><i>233</i>&nbsp;        final int longestNameLength = threadNames.stream().map(String::length).max(Integer::compare).get();</b>
+<b class="fc"><i>234</i>&nbsp;        int tid = 0;</b>
+<i>235</i>&nbsp;
+<b class="fc"><i>236</i>&nbsp;        final int COL_WIDTH_TID = 5;</b>
+<b class="fc"><i>237</i>&nbsp;        final int COL_WIDTH_THREAD = Math.max(longestNameLength, &quot;thread&quot;.length()) + 1;</b>
+<i>238</i>&nbsp;
+<b class="fc"><i>239</i>&nbsp;        sb</b>
+<b class="fc"><i>240</i>&nbsp;                .append(StringUtils.rightPad(&quot;tid&quot;, COL_WIDTH_TID))</b>
+<b class="fc"><i>241</i>&nbsp;                .append(StringUtils.rightPad(&quot;thread&quot;, COL_WIDTH_THREAD))</b>
+<b class="fc"><i>242</i>&nbsp;                .append(&quot;status&quot;)</b>
+<b class="fc"><i>243</i>&nbsp;                .append(&quot;\n&quot;)</b>
+<i>244</i>&nbsp;
+<b class="fc"><i>245</i>&nbsp;                .append(StringUtils.repeat(&quot;=&quot;, COL_WIDTH_TID - 1)).append(&quot; &quot;)</b>
+<b class="fc"><i>246</i>&nbsp;                .append(StringUtils.repeat(&quot;=&quot;, COL_WIDTH_THREAD - 1)).append(&quot; &quot;)</b>
+<b class="fc"><i>247</i>&nbsp;                .append(StringUtils.repeat(&quot;=&quot;, &quot;status&quot;.length())).append(&quot; &quot;).append(&#39;\n&#39;);</b>
+<i>248</i>&nbsp;
+<b class="fc"><i>249</i>&nbsp;        for (String threadName : threadNames) {</b>
+<b class="fc"><i>250</i>&nbsp;            sb.append(StringUtils.rightPad(String.valueOf(tid), COL_WIDTH_TID)); // tid</b>
+<b class="fc"><i>251</i>&nbsp;            sb.append(StringUtils.rightPad(threadName, COL_WIDTH_THREAD)); // thread</b>
+<b class="fc"><i>252</i>&nbsp;            sb.append(</b>
+<b class="fc"><i>253</i>&nbsp;                    Objects.equals(attention.peek(), threadName)</b>
+<i>254</i>&nbsp;                            ? &quot;RUNNING&quot;
+<b class="fc"><i>255</i>&nbsp;                            : threads.get(threadName)); // status</b>
+<b class="fc"><i>256</i>&nbsp;            sb.append(&#39;\n&#39;);</b>
+<b class="fc"><i>257</i>&nbsp;            tid++;</b>
+<b class="fc"><i>258</i>&nbsp;        }</b>
+<i>259</i>&nbsp;
+<b class="fc"><i>260</i>&nbsp;        return sb.append(&#39;\n&#39;).toString();</b>
+<i>261</i>&nbsp;    }
+<i>262</i>&nbsp;
+<i>263</i>&nbsp;    public String lookup(final int tid) {
+<b class="fc"><i>264</i>&nbsp;        final Iterator&lt;String&gt; s = threads.keySet().iterator();</b>
+<b class="fc"><i>265</i>&nbsp;        int i = 0;</b>
+<i>266</i>&nbsp;        String threadName;
+<i>267</i>&nbsp;
+<b class="fc"><i>268</i>&nbsp;        while (s.hasNext()) {</b>
+<b class="fc"><i>269</i>&nbsp;            threadName = s.next();</b>
+<b class="fc"><i>270</i>&nbsp;            if (i == tid) {</b>
+<b class="fc"><i>271</i>&nbsp;                return threadName;</b>
+<i>272</i>&nbsp;            }
+<b class="fc"><i>273</i>&nbsp;            i++;</b>
+<i>274</i>&nbsp;        }
+<i>275</i>&nbsp;
+<b class="fc"><i>276</i>&nbsp;        throw new NoSuchElementException(&quot;tid not found: &quot; + tid);</b>
+<i>277</i>&nbsp;    }
+<i>278</i>&nbsp;
+<i>279</i>&nbsp;    // Persistence
+<i>280</i>&nbsp;
+<i>281</i>&nbsp;    public void save(final File file) throws IOException {
+<b class="fc"><i>282</i>&nbsp;        MAPPER.writeValue(file, this);</b>
+<b class="fc"><i>283</i>&nbsp;    }</b>
+<i>284</i>&nbsp;
+<i>285</i>&nbsp;    public static ShoeLaces load(final File file) throws IOException, ClassNotFoundException {
+<b class="fc"><i>286</i>&nbsp;        if (file.length() == 0L) {</b>
+<i>287</i>&nbsp;            ;
+<b class="fc"><i>288</i>&nbsp;            return new ShoeLaces(FilenameUtils.getBaseName(file.getName()));</b>
+<i>289</i>&nbsp;        }
+<b class="fc"><i>290</i>&nbsp;        return MAPPER.readValue(file, ShoeLaces.class);</b>
+<i>291</i>&nbsp;    }
+<i>292</i>&nbsp;}
+</div>
+</div>
+
+<div class="footer">
+    
+    <div style="float:right;">generated on 2017-06-18 19:44</div>
+</div>
+</body>
+</html>
