@@ -72,8 +72,8 @@ public class ShoeLacesTest {
         final String first = randomThreadName();
         l.interrupt(first);
         assertCurrentEquals(l, first);
-        l.stop();
-        assertTrue(l.isSuspended());
+        l.pause();
+        assertTrue(l.isPaused());
     }
 
     public void testInterruptBringsToFront() throws Exception {
@@ -118,11 +118,11 @@ public class ShoeLacesTest {
         Assert.assertThrows(() -> l.exit(randomThreadName()));
     }
 
-    public void testStop() throws Exception {
+    public void testPause() throws Exception {
         final ShoeLaces l = new ShoeLaces();
         final String n = randomThreadName();
         l.interrupt(n);
-        l.stop();
+        l.pause();
         assertNull(l.current());
     }
 
@@ -140,25 +140,25 @@ public class ShoeLacesTest {
         assertThrows(() -> l.kill("nonexist"));
     }
 
-    public void testKillWillUndoSuspend() throws Exception {
+    public void testKillWillUndoPause() throws Exception {
         final ShoeLaces l = new ShoeLaces();
         final String n = randomThreadName();
         l.interrupt(n);
         assertTrue(l.isRunning());
 
-        l.stop();
+        l.pause();
         assertFalse(l.isRunning());
 
         l.kill();
     }
 
-    public void testExitWillUndoSuspend() throws Exception {
+    public void testExitWillUndoPause() throws Exception {
         final ShoeLaces l = new ShoeLaces();
         final String first = randomThreadName();
         final String second = randomThreadName();
         l.interrupt(first);
         l.interrupt(second);
-        l.stop();
+        l.pause();
         assertEquals(l.current(), null);
 
         l.exit();
@@ -173,7 +173,7 @@ public class ShoeLacesTest {
         l.interrupt(randomThreadName());
         l.resume(); // noop
 
-        l.stop();
+        l.pause();
         assertNull(l.current());
         l.resume(); // noop
     }
@@ -190,7 +190,7 @@ public class ShoeLacesTest {
         l.interrupt(first);
         assertTrue(l.isRunning());
 
-        l.stop();
+        l.pause();
         assertFalse(l.isRunning());
 
         l.interrupt(second);

@@ -64,18 +64,16 @@ public class App {
 
         final ShoeLaces db = open(file);
         final Options opts = new Options()
-                .addOption("a", "add", true, "spawn a new thread")
-                .addOption("k", "kill", false, "kill a thread")
-
-                .addOption("i", "interrupt", true, "run a new PRIMARY thread")
-                .addOption("r", "return", false, "exit the PRIMARY thread and return to <arg>, if given")
-
                 .addOption("h", "help")
 
-                .addOption("b", "background", false, "suspend the PRIMARY thread")
-                .addOption("f", "foreground", false, "resume the PRIMARY thread");
+                .addOption("s", "spawn", true, "spawn a new thread")
+                .addOption("k", "kill", true, "kill a thread")
 
+                .addOption("i", "interrupt", true, "run a new PRIMARY thread")
+                .addOption("ret", "return", true, "exit the PRIMARY thread and return to <arg>, if given")
 
+                .addOption("p", "pause", false, "pause (background) the PRIMARY thread")
+                .addOption("r", "resume", false, "resume (foreground) the PRIMARY thread");
 
         final CommandLine invocation;
         try {
@@ -88,14 +86,14 @@ public class App {
 
         if (invocation.hasOption("h")) {
             HelpFormatter formatter = new HelpFormatter();
-            formatter.printHelp( "sl [-akiehbf [THREAD]]", opts);
+            formatter.printHelp( "sl [-h] [-s|-k|-i|-ret [THREAD]] [-p|-r]", opts);
             exit(0);
             return;
         }
 
         // add
-        else if (invocation.hasOption("a")) {
-            final String t = findThreadFromOption(db, invocation, "a");
+        else if (invocation.hasOption("s")) {
+            final String t = findThreadFromOption(db, invocation, "s");
 
             if (db.isRunning()) {
                 out.println("spawning background: " + t);
@@ -109,9 +107,14 @@ public class App {
         // kill
         else if (invocation.hasOption("k")) {
             final String t = findThreadFromOption(db, invocation, "k");
-            final boolean self = StringUtils.isEmpty(t);
-            out.println("killing: " + (self ? "RUNNING" : t));
-            db.kill(t);
+
+            if (!StringUtils.isEmpty(t)) {
+                out.println("killing: " + t);
+                db.kill(t);
+            } else {
+                out.println("killing running: " + db.current());
+                db.kill();
+            }
         }
 
         // interrupt
@@ -122,22 +125,35 @@ public class App {
         }
 
         // exit
-        else if (invocation.hasOption("r")) {
-            final String returning = findThreadFromOption(db, invocation, "r");
-            out.println("returning to: " + returning);
-            db.exit(returning);
+        else if (invocation.hasOption("ret")) {
+            final String returning = findThreadFromOption(db, invocation, "ret");
+            if (returning != null && !returning.equals("")) {
+                out.println("returning to: " + returning);
+                db.exit(returning);
+            } else {
+                db.resume();
+                out.println("returning to current: " + db.current());
+            }
         }
 
         // background
-        else if (invocation.hasOption("b") && db.isRunning()) {
-            out.println("background");
-            db.stop();
+        else if (invocation.hasOption("p")) {
+            if (db.isRunning()) {
+                out.println("pause");
+                db.pause();
+            } else {
+                err.println("not running");
+            }
         }
 
         // foreground
-        else if (invocation.hasOption("f") && !db.isRunning()) {
-            out.println("foreground");
-            db.resume();
+        else if (invocation.hasOption("r")) {
+            if (db.isPaused()) {
+                out.println("resume");
+                db.resume();
+            } else {
+                err.println("not paused");
+            }
         }
 
         db.save(file);
