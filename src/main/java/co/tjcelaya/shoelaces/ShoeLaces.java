@@ -67,7 +67,7 @@ public class ShoeLaces implements Serializable {
             throw new IllegalArgumentException("invalid thread name: " + thread);
         }
 
-        threads.put(thread, "");
+        threads.put(thread, threads.getOrDefault(thread,""));
 
         if (attention.isEmpty()) {
             attention.push(thread);
@@ -91,7 +91,7 @@ public class ShoeLaces implements Serializable {
             throw new IllegalArgumentException("invalid thread name: " + thread);
         }
 
-        threads.put(thread, "");
+        threads.put(thread, threads.getOrDefault(thread,""));
         attention.push(thread);
     }
 
@@ -118,7 +118,7 @@ public class ShoeLaces implements Serializable {
     }
 
     private void updateThread(final String thread, final String status) {
-        threads.put(thread, threads.get(thread) + status);
+        threads.put(thread, threads.getOrDefault(thread, "") + status);
     }
 
     public void kill() {

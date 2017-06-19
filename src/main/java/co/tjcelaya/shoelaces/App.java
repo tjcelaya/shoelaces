@@ -42,17 +42,23 @@ public class App {
     }
 
     private static String findThreadFromOption(ShoeLaces db, CommandLine invocation, final String opt) {
-        final String raw = StringUtils.trimToEmpty(invocation.getOptionValue(opt));
-        if (!NumberUtils.isDigits(raw)) {
-            return raw;
+        String value = invocation.getOptionValue(opt, "");
+        if (value != null && value.isEmpty()) {
+            return null;
         }
 
+        final String raw = StringUtils.trimToEmpty(value);
+
         try {
+            if (!NumberUtils.isDigits(raw)) {
+                err.println("not only digits when looking for " + raw);
+                return raw;
+            }
+            err.println("lookup with parseint on " + raw);
             return db.lookup(parseInt(raw));
         } catch (NoSuchElementException e) {
             err.println(e.getMessage());
             out.println(db.print());
-            exit(1);
             return null;
         }
     }
@@ -67,14 +73,19 @@ public class App {
                 firstNonNull(
                         getenv("SHOELACES_FILE"),
                         DateTimeFormatter.ISO_DATE.format(LocalDate.now()))
-                + ".sldb").toFile();
+                        + ".sldb").toFile();
 
         final ShoeLaces db = open(file);
         final Options opts = new Options()
                 .addOption("h", "help")
 
                 .addOption("s", "spawn", true, "spawn a new thread")
-                .addOption("k", "kill", false, "kill a thread")
+                .addOption(Option.builder("k")
+                        .longOpt("kill")
+                        .hasArg(true)
+                        .optionalArg(true)
+                        .desc("kill a thread")
+                        .build())
 
                 .addOption("i", "interrupt", true, "run a new PRIMARY thread")
                 .addOption("ret", "return", true, "exit the PRIMARY thread and return to <arg>, if given")
@@ -93,7 +104,7 @@ public class App {
 
         if (invocation.hasOption("h")) {
             HelpFormatter formatter = new HelpFormatter();
-            formatter.printHelp( "sl [-h] [-s|-k|-i|-ret [THREAD]] [-p|-r]", opts);
+            formatter.printHelp("sl [-h] [-s|-k|-i|-ret [THREAD]] [-p|-r]", opts);
             exit(0);
             return;
         }
@@ -101,14 +112,8 @@ public class App {
         // add
         else if (invocation.hasOption("s")) {
             final String t = findThreadFromOption(db, invocation, "s");
-
-            if (db.isRunning()) {
-                out.println("spawning background: " + t);
-                db.spawn(t);
-            } else {
-                out.println("spawning and switching to: " + t);
-                db.interrupt(t);
-            }
+            out.println("spawning: " + t);
+            db.spawn(t);
         }
 
         // kill
@@ -118,9 +123,11 @@ public class App {
             if (!StringUtils.isEmpty(t)) {
                 out.println("killing: " + t);
                 db.kill(t);
-            } else {
+            } else if (db.current() != null) {
                 out.println("killing running: " + db.current());
                 db.kill();
+            } else {
+                out.println("nothing to kill");
             }
         }
 
