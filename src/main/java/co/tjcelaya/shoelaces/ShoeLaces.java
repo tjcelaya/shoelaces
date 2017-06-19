@@ -96,7 +96,7 @@ public class ShoeLaces implements Serializable {
     }
 
     public void exit() {
-        if (!isSuspended() && !isRunning()) {
+        if (!isPaused() && !isRunning()) {
             throw new IllegalStateException("Nothing from which to exit");
         }
 
@@ -122,7 +122,7 @@ public class ShoeLaces implements Serializable {
     }
 
     public void kill() {
-        if (!isSuspended() && !isRunning()) {
+        if (!isPaused() && !isRunning()) {
             throw new IllegalStateException("Nothing running to kill");
         }
 
@@ -140,7 +140,7 @@ public class ShoeLaces implements Serializable {
         attention.removeFirstOccurrence(t);
     }
 
-    public void stop() {
+    public void pause() {
         if (!attention.peek().equals(NULLFOCUS)) {
             attention.push(NULLFOCUS);
         }
@@ -156,7 +156,7 @@ public class ShoeLaces implements Serializable {
             attention.pop();
         }
 
-        // noop if not suspended
+        // noop if not paused
     }
 
     /**
@@ -197,16 +197,21 @@ public class ShoeLaces implements Serializable {
 
     private String status() {
         if (attention.isEmpty()) {
-            return " - STOP -";
-        } else {
-            return " RUN: " +
-                    attention.stream()
-                            .map(at -> ObjectUtils.firstNonNull(at, "PAUSED"))
-                            .collect(Collectors.joining(" < "));
+            return " - EMPTY -";
         }
+
+        final String attentionStack = attention.stream()
+                .map(at -> ObjectUtils.firstNonNull(at, "PAUSED"))
+                .collect(Collectors.joining(" < "));
+
+        if (attention.peek().equals(NULLFOCUS)) {
+            return " - PAUSED - " + attentionStack;
+        }
+
+        return " RUN: " + attentionStack;
     }
 
-    boolean isSuspended() {
+    boolean isPaused() {
         final String focus = attention.peek();
         return focus != null && focus.equals(NULLFOCUS);
     }
